@@ -360,7 +360,8 @@ const POS: React.FC<POSProps> = ({ menuItems, currentUser, onUpdateMenu }) => {
       <div className="w-96 bg-white rounded-3xl shadow-xl flex flex-col border border-slate-100">
         <div className="p-6 border-b border-slate-100">
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2 mb-4">
-                <ShoppingBag className="text-indigo-600" /> Current Order
+                <ShoppingBag className="text-indigo-600" /> 
+                {currentUser?.role === 'CUSTOMER' ? 'My Order' : `Table ${tableNumber}`}
             </h2>
             
             {currentUser?.role === 'CUSTOMER' ? (

@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
@@ -65,6 +65,48 @@ export const generateInventoryInsight = async (inventoryContext: string): Promis
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "AI service temporarily unavailable.";
+  }
+};
+
+export const generateRestockPlan = async (inventoryContext: string): Promise<any[]> => {
+  if (!apiKey) return [];
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `You are an intelligent purchasing manager for a restaurant.
+      Analyze the provided inventory data.
+      Context: The restaurant expects HIGH demand this upcoming weekend.
+      
+      Inventory Data (Name | Qty | Min Threshold | Status):
+      ${inventoryContext}
+      
+      Identify items that need restocking. Consider the High Demand prediction.
+      Return a list of items to order.
+      Prioritize items with 'Critical' or 'Low' status, but also consider items near threshold due to high demand.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              itemName: { type: Type.STRING },
+              currentQty: { type: Type.NUMBER },
+              suggestedQty: { type: Type.NUMBER },
+              priority: { type: Type.STRING },
+              reason: { type: Type.STRING }
+            }
+          }
+        }
+      }
+    });
+    
+    const text = response.text || "[]";
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    return [];
   }
 };
 

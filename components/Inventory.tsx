@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, AlertTriangle, DollarSign, Trash2, RefreshCw, Sparkles, Filter, TrendingDown, Plus, X, Save } from 'lucide-react';
+import { Search, Package, AlertTriangle, DollarSign, Trash2, RefreshCw, Sparkles, Filter, TrendingDown, Plus, X, Save, ClipboardList, ArrowRight } from 'lucide-react';
 import { InventoryItem } from '../types';
-import { generateInventoryInsight } from '../services/geminiService';
+import { generateInventoryInsight, generateRestockPlan } from '../services/geminiService';
 import { db } from '../services/db';
 
 const Inventory: React.FC = () => {
@@ -11,6 +11,11 @@ const Inventory: React.FC = () => {
   const [wasteCost, setWasteCost] = useState(14500);
   const [aiInsight, setAiInsight] = useState<string>("");
   const [loadingAi, setLoadingAi] = useState(false);
+
+  // Restock Plan State
+  const [restockPlan, setRestockPlan] = useState<any[]>([]);
+  const [showRestockModal, setShowRestockModal] = useState(false);
+  const [loadingRestock, setLoadingRestock] = useState(false);
 
   // Modal States
   const [isAddingItem, setIsAddingItem] = useState(false);
@@ -46,6 +51,15 @@ const Inventory: React.FC = () => {
     const result = await generateInventoryInsight(context);
     setAiInsight(result);
     setLoadingAi(false);
+  };
+
+  const handleSmartRestock = async () => {
+    setLoadingRestock(true);
+    const context = items.map(i => `${i.name} | ${i.quantity} ${i.unit} | Min: ${i.minThreshold} | ${i.status}`).join('\n');
+    const plan = await generateRestockPlan(context);
+    setRestockPlan(plan);
+    setLoadingRestock(false);
+    setShowRestockModal(true);
   };
 
   const handleLogWaste = (item: InventoryItem) => {
@@ -114,12 +128,20 @@ const Inventory: React.FC = () => {
         </div>
         <div className="flex gap-4">
           <button 
-            onClick={handleGenerateInsight}
-            disabled={loadingAi}
+            onClick={handleSmartRestock}
+            disabled={loadingRestock}
             className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
           >
+            <ClipboardList size={18} className={loadingRestock ? "animate-spin" : ""} />
+            {loadingRestock ? "Planning..." : "Smart Restock"}
+          </button>
+          <button 
+            onClick={handleGenerateInsight}
+            disabled={loadingAi}
+            className="flex items-center gap-2 bg-white text-indigo-600 border border-indigo-200 px-5 py-2.5 rounded-xl hover:bg-indigo-50 transition-all"
+          >
             <Sparkles size={18} className={loadingAi ? "animate-spin" : ""} />
-            {loadingAi ? "Analyzing..." : "AI Stock Analysis"}
+            AI Analysis
           </button>
           <button 
             onClick={() => setIsAddingItem(true)}
@@ -129,6 +151,79 @@ const Inventory: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Smart Restock Modal */}
+      {showRestockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden animate-bounce-in flex flex-col max-h-[85vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
+              <div className="flex items-center gap-3">
+                 <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                    <ClipboardList size={24} />
+                 </div>
+                 <div>
+                     <h3 className="text-xl font-bold text-indigo-900">Suggested Restock Plan</h3>
+                     <p className="text-xs text-indigo-600 font-medium">Based on current stock & predicted high demand</p>
+                 </div>
+              </div>
+              <button onClick={() => setShowRestockModal(false)} className="p-2 hover:bg-indigo-200 rounded-full text-indigo-700"><X size={20}/></button>
+            </div>
+            
+            <div className="p-0 overflow-y-auto flex-1">
+              {restockPlan.length === 0 ? (
+                <div className="p-10 text-center text-slate-500">
+                  <p>All stock levels look good! No immediate restocking required.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-slate-500 sticky top-0">
+                    <tr>
+                      <th className="p-4 text-xs font-bold uppercase">Item</th>
+                      <th className="p-4 text-xs font-bold uppercase">Current</th>
+                      <th className="p-4 text-xs font-bold uppercase">Suggested Order</th>
+                      <th className="p-4 text-xs font-bold uppercase">Priority</th>
+                      <th className="p-4 text-xs font-bold uppercase">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {restockPlan.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="p-4 font-bold text-slate-900">{item.itemName}</td>
+                        <td className="p-4 text-slate-600">{item.currentQty}</td>
+                        <td className="p-4 font-bold text-indigo-600 bg-indigo-50/50">
+                            <span className="flex items-center gap-1">
+                                {item.suggestedQty} <Plus size={12} />
+                            </span>
+                        </td>
+                        <td className="p-4">
+                           <span className={`px-2 py-1 rounded text-xs font-bold border ${
+                             item.priority === 'High' ? 'bg-red-50 text-red-600 border-red-100' :
+                             item.priority === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                             'bg-blue-50 text-blue-600 border-blue-100'
+                           }`}>
+                             {item.priority}
+                           </span>
+                        </td>
+                        <td className="p-4 text-xs text-slate-500 max-w-xs">{item.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button onClick={() => setShowRestockModal(false)} className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-white">Close</button>
+              <button 
+                onClick={() => { alert("Purchase Orders created and emailed to suppliers!"); setShowRestockModal(false); }}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 flex items-center gap-2 shadow-lg shadow-indigo-200"
+              >
+                Create Purchase Orders <ArrowRight size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Item Modal */}
       {isAddingItem && (
