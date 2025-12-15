@@ -1,0 +1,7 @@
+{
+  "name": "Intelligent Restaurant OS",
+  "description": "A comprehensive, AI-powered operating system for modern restaurants. Integrates Bookings, POS, CRM, and Inventory with predictive analytics powered by Gemini.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
