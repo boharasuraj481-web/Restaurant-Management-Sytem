@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, CalendarDays, Users, UtensilsCrossed, Store, Settings, LogOut, Briefcase } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Users, UtensilsCrossed, Store, Settings, LogOut, Briefcase, Truck, ChefHat } from 'lucide-react';
 import { ViewState, UserRole, AuthUser } from '../types';
 
 interface SidebarProps {
@@ -15,10 +15,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, currentUse
   const getMenuItems = () => {
     const allItems = [
       { id: ViewState.DASHBOARD, icon: LayoutDashboard, label: 'Dashboard', roles: ['ADMIN'] },
+      { id: ViewState.ORDERS, icon: Truck, label: 'Delivery & Orders', roles: ['ADMIN', 'WAITER'] },
+      { id: ViewState.KITCHEN, icon: ChefHat, label: 'Kitchen Display', roles: ['ADMIN', 'KITCHEN'] },
       { id: ViewState.BOOKINGS, icon: CalendarDays, label: 'Bookings', roles: ['ADMIN', 'WAITER'] },
       { id: ViewState.POS, icon: Store, label: 'Point of Sale', roles: ['ADMIN', 'WAITER'] },
       { id: ViewState.CRM, icon: Users, label: 'Customers', roles: ['ADMIN'] },
-      { id: ViewState.INVENTORY, icon: UtensilsCrossed, label: 'Inventory', roles: ['ADMIN'] },
+      { id: ViewState.INVENTORY, icon: UtensilsCrossed, label: 'Inventory', roles: ['ADMIN', 'KITCHEN'] },
       { id: ViewState.STAFF, icon: Briefcase, label: 'Staff & Payroll', roles: ['ADMIN'] },
     ];
 

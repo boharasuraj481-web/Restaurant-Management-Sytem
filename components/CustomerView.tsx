@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { MenuItem } from '../types';
+import React, { useState, useEffect } from 'react';
+import { MenuItem, Order } from '../types';
 import { ShoppingBag, Utensils, Wine, Cake, Plus, Minus, X, User, Phone, MapPin, CheckCircle, ArrowRight, Map, ExternalLink } from 'lucide-react';
 import { verifyAddress } from '../services/geminiService';
+import { db } from '../services/db';
 
 interface CustomerViewProps {
   menuItems: MenuItem[];
@@ -13,6 +14,7 @@ interface CartItem extends MenuItem {
 }
 
 const CustomerView: React.FC<CustomerViewProps> = ({ menuItems, onExit }) => {
+  const [categories, setCategories] = useState<{name: string, icon: any}[]>([]);
   const [category, setCategory] = useState<string>('All');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -27,13 +29,18 @@ const CustomerView: React.FC<CustomerViewProps> = ({ menuItems, onExit }) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{text: string, mapUri?: string} | null>(null);
 
-  const categories = [
-    { name: 'All', icon: ShoppingBag },
-    { name: 'Starter', icon: Utensils },
-    { name: 'Main', icon: Utensils },
-    { name: 'Dessert', icon: Cake },
-    { name: 'Drink', icon: Wine }
-  ];
+  useEffect(() => {
+    // Map known categories to icons, fallback to Utensils for unknown/custom
+    const fetchedCats = db.menu.getCategories();
+    const mapped = fetchedCats.map(cat => {
+        let icon = Utensils;
+        if (cat === 'Drink' || cat === 'Beverage') icon = Wine;
+        if (cat === 'Dessert') icon = Cake;
+        if (cat === 'Starter') icon = Utensils;
+        return { name: cat, icon };
+    });
+    setCategories([{ name: 'All', icon: ShoppingBag }, ...mapped]);
+  }, []);
 
   const addToCart = (item: MenuItem) => {
     setCart(prev => {
@@ -62,6 +69,31 @@ const CustomerView: React.FC<CustomerViewProps> = ({ menuItems, onExit }) => {
   };
 
   const handlePlaceOrder = () => {
+    // Save to DB
+    const tax = total * 0.13;
+    const newOrder: Order = {
+        id: `ORD-${Date.now()}`,
+        items: cart.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            qty: item.qty
+        })),
+        subtotal: total,
+        tax: tax,
+        total: total + tax,
+        timestamp: new Date().toISOString(),
+        status: 'pending', // Online orders usually pending initially
+        method: 'Online',
+        customerDetails: {
+            name: customerDetails.name,
+            phone: customerDetails.phone,
+            address: customerDetails.address
+        }
+    };
+    db.orders.add(newOrder);
+
+    // Show Success UI
     setOrderStep('SUCCESS');
     setTimeout(() => {
         setCart([]);

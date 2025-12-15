@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Save, X, Edit3, DollarSign, Database, Mail, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Save, X, Edit3, DollarSign, Database, Mail, AlertTriangle, List, Tag } from 'lucide-react';
 import { MenuItem } from '../types';
 import { db } from '../services/db';
 
@@ -10,11 +10,35 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ menuItems, setMenuItems }) => {
   const [isAdding, setIsAdding] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState('');
   const [newItem, setNewItem] = useState<Partial<MenuItem>>({
     name: '',
     price: 0,
-    category: 'Main'
+    category: ''
   });
+
+  useEffect(() => {
+    setCategories(db.menu.getCategories());
+  }, []);
+
+  const saveCategories = (cats: string[]) => {
+      setCategories(cats);
+      db.menu.saveCategories(cats);
+  };
+
+  const handleAddCategory = () => {
+      if (newCategory && !categories.includes(newCategory)) {
+          saveCategories([...categories, newCategory]);
+          setNewCategory('');
+      }
+  };
+
+  const handleDeleteCategory = (cat: string) => {
+      if (confirm(`Delete category "${cat}"? Items in this category will need update.`)) {
+          saveCategories(categories.filter(c => c !== cat));
+      }
+  };
 
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this item?')) {
@@ -23,19 +47,19 @@ const Settings: React.FC<SettingsProps> = ({ menuItems, setMenuItems }) => {
   };
 
   const handleAdd = () => {
-    if (!newItem.name || !newItem.price) return;
+    if (!newItem.name || !newItem.price || !newItem.category) return;
     
     const item: MenuItem = {
       id: Date.now().toString(),
       name: newItem.name,
       price: Number(newItem.price),
-      category: newItem.category as any,
+      category: newItem.category,
       image: newItem.image
     };
 
     setMenuItems(prev => [...prev, item]);
     setIsAdding(false);
-    setNewItem({ name: '', price: 0, category: 'Main' });
+    setNewItem({ name: '', price: 0, category: categories[0] || '' });
   };
 
   const handleEmailBackup = () => {
@@ -43,6 +67,7 @@ const Settings: React.FC<SettingsProps> = ({ menuItems, setMenuItems }) => {
     const allData = {
         credentials: db.users.getAll(),
         menu: db.menu.getAll(),
+        categories: db.menu.getCategories(),
         inventory: db.inventory.getAll(),
         bookings: db.bookings.getAll(),
         customers: db.customers.getAll(),
@@ -82,12 +107,44 @@ const Settings: React.FC<SettingsProps> = ({ menuItems, setMenuItems }) => {
         </div>
       </div>
 
+      {/* Categories Section */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <List size={20} /> Menu Categories
+          </h2>
+          <div className="flex flex-wrap gap-3 mb-4">
+              {categories.map(cat => (
+                  <div key={cat} className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-100">
+                      <Tag size={14} />
+                      <span className="font-medium">{cat}</span>
+                      <button onClick={() => handleDeleteCategory(cat)} className="hover:text-red-500 transition-colors"><X size={14} /></button>
+                  </div>
+              ))}
+          </div>
+          <div className="flex gap-2 max-w-sm">
+              <input 
+                type="text" 
+                placeholder="New Category Name" 
+                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                value={newCategory}
+                onChange={e => setNewCategory(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+              />
+              <button 
+                onClick={handleAddCategory}
+                className="bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800"
+              >
+                  <Plus size={20} />
+              </button>
+          </div>
+      </div>
+
       {/* Menu Management Section */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <h2 className="text-xl font-bold text-slate-900">Menu Management</h2>
           <button 
-            onClick={() => setIsAdding(true)}
+            onClick={() => { setIsAdding(true); setNewItem({...newItem, category: categories[0]}); }}
             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
           >
             <Plus size={18} /> Add Item
@@ -110,13 +167,13 @@ const Settings: React.FC<SettingsProps> = ({ menuItems, setMenuItems }) => {
                <label className="text-xs font-bold text-slate-500 uppercase">Category</label>
                <select 
                  value={newItem.category} 
-                 onChange={e => setNewItem({...newItem, category: e.target.value as any})}
+                 onChange={e => setNewItem({...newItem, category: e.target.value})}
                  className="px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                >
-                 <option value="Starter">Starter</option>
-                 <option value="Main">Main</option>
-                 <option value="Dessert">Dessert</option>
-                 <option value="Drink">Drink</option>
+                 <option value="" disabled>Select Category</option>
+                 {categories.map(cat => (
+                     <option key={cat} value={cat}>{cat}</option>
+                 ))}
                </select>
             </div>
             <div className="flex flex-col gap-2">

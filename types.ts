@@ -2,6 +2,8 @@ export enum ViewState {
   DASHBOARD = 'DASHBOARD',
   BOOKINGS = 'BOOKINGS',
   POS = 'POS',
+  ORDERS = 'ORDERS', // New view for Delivery Management
+  KITCHEN = 'KITCHEN', // New view for Kitchen Display System
   CRM = 'CRM',
   INVENTORY = 'INVENTORY',
   STAFF = 'STAFF',
@@ -9,7 +11,7 @@ export enum ViewState {
   CUSTOMER_VIEW = 'CUSTOMER_VIEW'
 }
 
-export type UserRole = 'ADMIN' | 'WAITER' | 'CUSTOMER';
+export type UserRole = 'ADMIN' | 'WAITER' | 'CUSTOMER' | 'KITCHEN';
 
 export interface AuthUser {
   id: string;
@@ -44,7 +46,7 @@ export interface MenuItem {
   id: string;
   name: string;
   price: number;
-  category: 'Starter' | 'Main' | 'Dessert' | 'Drink';
+  category: string;
   image?: string;
   description?: string;
 }
@@ -83,4 +85,30 @@ export interface Shift {
   startTime: string;
   endTime: string;
   area: string;
+}
+
+export interface OrderItem {
+  id: string;
+  name: string;
+  price: number;
+  qty: number;
+}
+
+export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'paid';
+
+export interface Order {
+  id: string;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  timestamp: string;
+  status: OrderStatus;
+  method: 'Cash' | 'Card' | 'Online';
+  customerDetails?: {
+      name: string;
+      phone?: string;
+      address?: string;
+  };
+  table?: string;
 }

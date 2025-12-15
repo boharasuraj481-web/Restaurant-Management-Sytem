@@ -8,8 +8,10 @@ import Inventory from './components/Inventory';
 import Staff from './components/Staff';
 import Settings from './components/Settings';
 import CustomerView from './components/CustomerView';
+import OnlineOrders from './components/OnlineOrders';
+import KitchenDisplay from './components/KitchenDisplay'; // Import KDS
 import { ViewState, MenuItem, UserRole, AuthUser } from './types';
-import { User, Shield, Coffee, Key, ArrowRight, CheckCircle } from 'lucide-react';
+import { User, Shield, Coffee, Key, ArrowRight, CheckCircle, ChefHat } from 'lucide-react';
 import { db } from './services/db';
 
 const App: React.FC = () => {
@@ -69,6 +71,8 @@ const App: React.FC = () => {
         setCurrentView(ViewState.CUSTOMER_VIEW);
       } else if (user.role === 'WAITER') {
         setCurrentView(ViewState.POS);
+      } else if (user.role === 'KITCHEN') {
+        setCurrentView(ViewState.KITCHEN);
       } else {
         setCurrentView(ViewState.DASHBOARD);
       }
@@ -140,10 +144,10 @@ const App: React.FC = () => {
                 <Shield size={16} className="text-indigo-400" /> <span className="text-sm">Admin</span>
               </div>
               <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
-                <User size={16} className="text-purple-400" /> <span className="text-sm">Staff</span>
+                <ChefHat size={16} className="text-blue-400" /> <span className="text-sm">Kitchen</span>
               </div>
               <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
-                <Coffee size={16} className="text-green-400" /> <span className="text-sm">Customer</span>
+                <User size={16} className="text-purple-400" /> <span className="text-sm">Staff</span>
               </div>
             </div>
           </div>
@@ -300,15 +304,19 @@ const App: React.FC = () => {
     return <CustomerView menuItems={menuItems} onExit={() => setCurrentUser(null)} />;
   }
 
-  // Admin/Waiter View Container
+  // Admin/Waiter/Kitchen View Container
   const renderContent = () => {
     switch (currentView) {
       case ViewState.DASHBOARD:
         return <Dashboard />;
+      case ViewState.ORDERS: 
+        return <OnlineOrders />;
+      case ViewState.KITCHEN: // New Route
+        return <KitchenDisplay />;
       case ViewState.BOOKINGS:
         return <Bookings />;
       case ViewState.POS:
-        return <POS menuItems={menuItems} currentUser={currentUser} />;
+        return <POS menuItems={menuItems} currentUser={currentUser} onUpdateMenu={updateMenuItemsWrapper} />;
       case ViewState.CRM:
         return <CRM />;
       case ViewState.INVENTORY:

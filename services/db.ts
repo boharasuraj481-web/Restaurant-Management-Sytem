@@ -1,8 +1,9 @@
-import { Booking, Customer, MenuItem, InventoryItem, Employee, Shift, AuthUser } from '../types';
+import { Booking, Customer, MenuItem, InventoryItem, Employee, Shift, AuthUser, Order } from '../types';
 
 // Constants for initial data
 const INITIAL_USERS: AuthUser[] = [
-  { id: 'admin', password: 'password', role: 'ADMIN', name: 'Administrator' }
+  { id: 'admin', password: 'password', role: 'ADMIN', name: 'Administrator' },
+  { id: 'chef', password: 'password', role: 'KITCHEN', name: 'Head Chef' }
 ];
 
 const INITIAL_MENU_ITEMS: MenuItem[] = [
@@ -15,6 +16,8 @@ const INITIAL_MENU_ITEMS: MenuItem[] = [
   { id: '7', name: 'Gorkha Beer', price: 650, category: 'Drink' },
   { id: '8', name: 'Lassi', price: 150, category: 'Drink' },
 ];
+
+const INITIAL_MENU_CATEGORIES = ['Starter', 'Main', 'Dessert', 'Drink'];
 
 const INITIAL_INVENTORY_CATEGORIES = ['Produce', 'Meat', 'Dairy', 'Dry Goods', 'Beverage', 'Supplies'];
 
@@ -56,6 +59,76 @@ const INITIAL_SHIFTS: Shift[] = [
   { id: '4', employeeId: '3', day: 'Tomorrow', startTime: '16:00', endTime: '00:00', area: 'Dining' },
 ];
 
+// Generate some dummy orders for today for the dashboard
+const generateInitialOrders = (): Order[] => {
+    const orders: Order[] = [];
+    const now = new Date();
+    
+    // Create 15 orders scattered through the day
+    for(let i=0; i<15; i++) {
+        const hour = 12 + Math.floor(Math.random() * 10); // 12pm to 10pm
+        const time = new Date(now);
+        time.setHours(hour, Math.floor(Math.random() * 60), 0, 0);
+        
+        orders.push({
+            id: `ORD-${1000 + i}`,
+            items: [
+                { id: '1', name: 'Chicken Momo', price: 250, qty: 2 },
+                { id: '6', name: 'Milk Tea', price: 40, qty: 2 }
+            ],
+            subtotal: 580,
+            tax: 75.4,
+            total: 655.4,
+            timestamp: time.toISOString(),
+            status: 'paid', // Completed historic orders
+            method: Math.random() > 0.5 ? 'Card' : 'Cash',
+            table: `T${Math.floor(Math.random() * 10) + 1}`
+        });
+    }
+
+    // Add active Delivery Orders
+    orders.push({
+        id: 'ORD-DLV-101',
+        items: [{ id: '3', name: 'Thakali Set (Veg)', price: 450, qty: 2 }],
+        subtotal: 900,
+        tax: 117,
+        total: 1017,
+        timestamp: new Date().toISOString(),
+        status: 'pending',
+        method: 'Online',
+        customerDetails: { name: 'Sanjay Gupta', phone: '9841223344', address: 'Lazimpat, Kathmandu' }
+    });
+
+    orders.push({
+        id: 'ORD-DLV-102',
+        items: [{ id: '1', name: 'Chicken Momo', price: 250, qty: 3 }, { id: '5', name: 'Sel Roti', price: 50, qty: 5 }],
+        subtotal: 1000,
+        tax: 130,
+        total: 1130,
+        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 mins ago
+        status: 'preparing',
+        method: 'Online',
+        customerDetails: { name: 'Priya Sharma', phone: '9801998877', address: 'Baneshwor, Kathmandu' }
+    });
+    
+    // Add active Kitchen Order (from POS)
+    orders.push({
+        id: 'ORD-POS-202',
+        items: [{ id: '2', name: 'Buff Chowmein', price: 200, qty: 1 }],
+        subtotal: 200,
+        tax: 26,
+        total: 226,
+        timestamp: new Date().toISOString(),
+        status: 'pending',
+        method: 'Cash',
+        table: 'T5'
+    });
+
+    return orders;
+};
+
+const INITIAL_ORDERS: Order[] = generateInitialOrders();
+
 const load = <T>(key: string, initial: T): T => {
   const stored = localStorage.getItem(`cenit_${key}`);
   return stored ? JSON.parse(stored) : initial;
@@ -78,6 +151,8 @@ export const db = {
   menu: {
     getAll: () => load<MenuItem[]>('menu', INITIAL_MENU_ITEMS),
     save: (data: MenuItem[]) => save('menu', data),
+    getCategories: () => load<string[]>('menu_categories', INITIAL_MENU_CATEGORIES),
+    saveCategories: (data: string[]) => save('menu_categories', data),
   },
   inventory: {
     getAll: () => load<InventoryItem[]>('inventory', INITIAL_INVENTORY),
@@ -98,5 +173,14 @@ export const db = {
     saveEmployees: (data: Employee[]) => save('employees', data),
     getShifts: () => load<Shift[]>('shifts', INITIAL_SHIFTS),
     saveShifts: (data: Shift[]) => save('shifts', data),
+  },
+  orders: {
+    getAll: () => load<Order[]>('orders', INITIAL_ORDERS),
+    save: (data: Order[]) => save('orders', data),
+    add: (order: Order) => {
+        const orders = db.orders.getAll();
+        orders.push(order);
+        save('orders', orders);
+    }
   }
 };

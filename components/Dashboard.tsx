@@ -2,16 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Sparkles, TrendingUp, Users, DollarSign, Clock } from 'lucide-react';
 import { generateInsights } from '../services/geminiService';
-
-const data = [
-  { name: '12pm', sales: 4000, visitors: 24 },
-  { name: '2pm', sales: 3000, visitors: 18 },
-  { name: '4pm', sales: 2000, visitors: 12 },
-  { name: '6pm', sales: 12000, visitors: 65 },
-  { name: '8pm', sales: 18000, visitors: 85 },
-  { name: '10pm', sales: 14000, visitors: 55 },
-  { name: '12am', sales: 6000, visitors: 30 },
-];
+import { db } from '../services/db';
+import { Order } from '../types';
 
 const StatCard = ({ icon: Icon, label, value, trend, trendUp }: any) => (
   <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
@@ -30,10 +22,50 @@ const StatCard = ({ icon: Icon, label, value, trend, trendUp }: any) => (
 
 const Dashboard: React.FC = () => {
   const [insight, setInsight] = useState<string>("Loading AI prediction...");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [todayRevenue, setTodayRevenue] = useState(0);
+  const [todayGuests, setTodayGuests] = useState(0);
+  const [chartData, setChartData] = useState<any[]>([]);
 
   useEffect(() => {
+    // Load Orders from DB
+    const allOrders = db.orders.getAll();
+    setOrders(allOrders);
+
+    // Filter for today
+    const today = new Date().toDateString();
+    const todayOrders = allOrders.filter(o => new Date(o.timestamp).toDateString() === today);
+
+    // Calculate Metrics
+    const revenue = todayOrders.reduce((acc, order) => acc + order.total, 0);
+    // Rough estimate: guests = orders * 2 (or use booking data if linked, using simple metric for now)
+    const guests = todayOrders.length * 2; 
+
+    setTodayRevenue(revenue);
+    setTodayGuests(guests);
+
+    // Generate Chart Data
+    const hours = [12, 14, 16, 18, 20, 22, 24]; // 2-hour buckets starting at 12pm
+    const data = hours.map(h => {
+        const label = h === 12 ? '12pm' : h === 24 ? '12am' : h > 12 ? `${h-12}pm` : `${h}am`;
+        // Filter orders in the 2 hour window ending at h
+        // Simplification: Bucket based on hour
+        const bucketOrders = todayOrders.filter(o => {
+            const oh = new Date(o.timestamp).getHours();
+            return oh >= h && oh < h + 2;
+        });
+        
+        return {
+            name: label,
+            sales: bucketOrders.reduce((acc, o) => acc + o.total, 0),
+            visitors: bucketOrders.length * 2
+        };
+    });
+    setChartData(data);
+
+    // Fetch AI Insight
     const fetchInsight = async () => {
-      const context = "Current Time: 7:30 PM. Occupancy: 85%. Waitlist: 4 parties. Trending Menu Item: Truffle Pasta. Inventory Alert: Red Wine low.";
+      const context = `Current Time: ${new Date().toLocaleTimeString()}. Total Revenue Today: Rs ${revenue}. Order Count: ${todayOrders.length}.`;
       const aiResponse = await generateInsights(context);
       setInsight(aiResponse);
     };
@@ -49,7 +81,7 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="bg-indigo-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg shadow-indigo-200">
             <Clock size={18} />
-            <span className="font-mono">19:32 PM</span>
+            <span className="font-mono">{new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
         </div>
       </div>
 
@@ -71,19 +103,19 @@ const Dashboard: React.FC = () => {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={DollarSign} label="Total Revenue (Today)" value="Rs. 42,890" trend="+12.5%" trendUp={true} />
-        <StatCard icon={Users} label="Total Guests" value="142" trend="+8.2%" trendUp={true} />
-        <StatCard icon={TrendingUp} label="Avg. Table Turn" value="52m" trend="-4.1%" trendUp={false} />
-        <StatCard icon={Clock} label="Waitlist Time" value="15m" trend="+2m" trendUp={false} />
+        <StatCard icon={DollarSign} label="Total Revenue (Today)" value={`Rs. ${todayRevenue.toLocaleString()}`} trend="+12.5%" trendUp={true} />
+        <StatCard icon={Users} label="Total Guests" value={todayGuests} trend="+8.2%" trendUp={true} />
+        <StatCard icon={TrendingUp} label="Avg. Order Value" value={`Rs. ${orders.length > 0 ? Math.round(todayRevenue / (orders.length || 1)).toLocaleString() : 0}`} trend="-4.1%" trendUp={false} />
+        <StatCard icon={Clock} label="Orders Today" value={orders.filter(o => new Date(o.timestamp).toDateString() === new Date().toDateString()).length} trend="+2" trendUp={true} />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">Revenue Trend</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-6">Revenue Trend (Today)</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3}/>
@@ -107,7 +139,7 @@ const Dashboard: React.FC = () => {
           <h3 className="text-lg font-bold text-slate-900 mb-6">Occupancy by Hour</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8'}} />
